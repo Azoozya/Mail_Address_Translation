@@ -22,11 +22,11 @@ pub fn full_test() -> () {
     assert_eq!(test_create_drop(&metadb, false),true);
 
     metadb = DBase::init(&path, &conn);
-    assert_eq!(test_insert_delete(&metadb, false));
+    assert_eq!(test_insert_delete(&metadb, false),true);
     DBase::release(&mut metadb);
 
     metadb = DBase::init(&path, &conn);
-    assert_eq!(test_select(&metadb, false));
+    assert_eq!(test_select(&metadb, false),true);
     DBase::release(&mut metadb);
 
     if let Err((_, e)) = conn.close() {
