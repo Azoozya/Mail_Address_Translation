@@ -8,6 +8,62 @@ pub enum MATable {
     Address,
 }
 
+/*
+
+	Forge and transmit a request SELECT *what* FROM *self* *filter*.
+	Return a Vector which contain every results and the size of the vector, doesn't handle error 
+    select(&self, db: &DBase, what: String, filter: String) -> Result<(Vec<MATRow>, usize),rusqlite::Error>
+
+	Forge a request DELETE targeting by id/(alias,domain).
+	Return the _delete result 
+    delete_by_id(&self, db: &DBase, value: &MATRow) -> bool
+
+	Forge a request DELETE targeting by name/user.
+	Return the _delete result 
+	delete_by_name(&self, db: &DBase, value: &MATRow) -> bool
+
+	Forge and transmit a request CREATE.
+	Return false if error occured, otherwise true
+	create(&self, db: &DBase) -> bool
+    
+	Forge and transmit a request DROP.
+	Return false if error occured, otherwise true
+	drop(&self, db: &DBase) -> bool
+
+	Check if the *value* is already in base, forge a request INSERT , retrieve id's autoincremented.
+	Return false if value already in base (except for MATable::Address) , if _execute_no_param return false , if _retrieve_id returned an error , otherwise true; 
+	insert(&self, db: &DBase, value: &mut MATRow) -> bool
+
+	Return the name of the table corresponding to *row*
+    get(row: &MATable) -> &'static str
+    
+============================================================================================
+
+	Execute the request *req* and handle error. 
+	Return true if success , otherwise false
+    _execute_no_param(&self, db: &DBase, req: &str) -> bool
+
+	Forge the request to test existence in base. 
+	Return the opposite of _exist result and handle error (return false)      
+	_unique_name(&self, db: &DBase, name: &String) -> bool
+
+	Called by _unique_name to transmit the request. 
+	Return true if the request returned something, false if nothing , doesn't handle errors
+    _exist(&self, db: &DBase, what: String, filter: String) -> Result<bool, rusqlite::Error>
+
+	Return the name of the table corresponding to self
+    _get(&self) -> &str
+
+	Forge and transmit a requeset SELECT. 
+	Return the id/user if found one, error if none
+    _retrieve_id(&self, db: &DBase, entity: &MATRow) -> Result<i32, rusqlite::Error>
+
+
+    Called by delete_by_*. Transmit the request DELETE FROM *self* *filter*. 
+	Return true if success , otherwise false
+    _delete(&self, db: &DBase, filter: String) -> bool
+
+*/
 
 impl MATable {
     // Get table name
@@ -20,12 +76,12 @@ impl MATable {
         }
     }
 
-    pub fn get(row: &MATable) -> &'static str{
+    pub fn get(row: MATable) -> &'static str {
         match row {
-                MATable::Users => "Users",
-                MATable::Aliases => "Aliases",
-                MATable::Domains => "Domains",
-                MATable::Address => "Address",
+            MATable::Users => "Users",
+            MATable::Aliases => "Aliases",
+            MATable::Domains => "Domains",
+            MATable::Address => "Address",
         }
     }
 
@@ -71,28 +127,43 @@ impl MATable {
 
     fn _retrieve_id(&self, db: &DBase, entity: &MATRow) -> Result<i32, rusqlite::Error> {
         let tabl = self._get();
-        let entity_name: &String = match entity {
+        let req: String = match entity {
             MATRow::User {
                 id: _,
                 name,
                 pass: _,
-            } => name,
-            MATRow::Alias { id: _, name } => name,
+            } => format!(
+                "select `id` from {} where `name` = '{}'",
+                MATable::get(MATable::Users),
+                name
+            ),
+            MATRow::Alias { id: _, name } => format!(
+                "select `id` from {} where `name` = '{}'",
+                MATable::get(MATable::Aliases),
+                name
+            ),
             MATRow::Domain {
                 id: _,
                 name,
                 nb_ref: _,
-            } => name,
+            } => format!(
+                "select `id` from {} where `name` = '{}'",
+                MATable::get(MATable::Domains),
+                name
+            ),
             MATRow::Address {
                 user: _,
-                alias: _,
-                domain: _,
-            } => {
-                return Err(rusqlite::Error::QueryReturnedNoRows);
-            }
+                alias,
+                domain,
+            } => format!(
+                "select `user` from {} where `alias` = '{}' and `domain` = {}",
+                MATable::get(MATable::Address),
+                alias,
+                domain
+            ),
         };
 
-        let req = format!("select `id` from {} where `name` = '{}'", tabl, entity_name);
+        println!("{}", req);
         let mut stmt = db.conn.prepare(&req)?;
         let mut rows = stmt.query([])?;
         match rows.next()? {
@@ -186,18 +257,7 @@ impl MATable {
 
         if self._execute_no_param(db, &req) {
             match self._retrieve_id(db, value) {
-                Err(_) => {
-                    if let MATRow::Address {
-                        user: _,
-                        alias: _,
-                        domain: _,
-                    } = value
-                    {
-                        return true;
-                    } else {
-                        return false;
-                    }
-                }
+                Err(_) => false,
                 Ok(id_inside) => match value {
                     MATRow::Alias { id, name: _ } => {
                         *id = id_inside;
@@ -232,46 +292,52 @@ impl MATable {
     }
 
     pub fn delete_by_id(&self, db: &DBase, value: &MATRow) -> bool {
-        let filter: String = match value {
+        if db.up == false {
+            return false;
+        }
+		let filter: String = match value {
             MATRow::User {
                 id,
                 name: _,
                 pass: _,
-            } => format!("where id = {}", id),
-            MATRow::Alias { id, name: _ } => format!("where id = {}", id),
+            } => format!("where `id` = {}", id),
+            MATRow::Alias { id, name: _ } => format!("where `id` = {}", id),
             MATRow::Domain {
                 id,
                 name: _,
                 nb_ref: _,
-            } => format!("where id = {}", id),
+            } => format!("where `id` = {}", id),
             MATRow::Address {
                 user: _,
                 alias,
                 domain,
-            } => format!("where alias = {} and domain = {}", alias, domain),
+            } => format!("where `alias` = {} and `domain` = {}", alias, domain),
         };
 
         self._delete(&db, filter)
     }
 
     pub fn delete_by_name(&self, db: &DBase, value: &MATRow) -> bool {
-        let filter: String = match value {
+        if db.up == false {
+            return false;
+        }        
+		let filter: String = match value {
             MATRow::User {
                 id: _,
                 name,
                 pass: _,
-            } => format!("where name = '{}'", name.clone()),
-            MATRow::Alias { id: _, name } => format!("where name = '{}'", name.clone()),
+            } => format!("where `name` = '{}'", name.clone()),
+            MATRow::Alias { id: _, name } => format!("where `name` = '{}'", name.clone()),
             MATRow::Domain {
                 id: _,
                 name,
                 nb_ref: _,
-            } => format!("where name = '{}'", name.clone()),
+            } => format!("where `name` = '{}'", name.clone()),
             MATRow::Address {
                 user,
                 alias: _,
                 domain: _,
-            } => format!("where user = '{}'", user),
+            } => format!("where `user` = '{}'", user),
         };
 
         self._delete(&db, filter)
