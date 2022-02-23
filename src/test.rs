@@ -1,8 +1,15 @@
+#[cfg(test)]
+pub mod tests {
+
 use crate::base::DBase;
 use crate::table::MATable;
 use crate::row::MATRow;
 
-pub fn full_test(path: String) -> () {
+
+
+#[test]
+pub fn full_test() -> () {
+	let path = String::from("./test.db");
     let conn = match rusqlite::Connection::open(&path) {
         Err(e) => {
             println!("{}", e);
@@ -408,4 +415,6 @@ fn test_select(db: &DBase, verbose: bool) -> bool {
         if result { "Success" } else { "Failed" }
     );
     result
+}
+
 }
