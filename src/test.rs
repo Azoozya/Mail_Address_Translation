@@ -6,7 +6,7 @@ pub mod tests {
     use crate::table::MATable;
 
     #[test]
-    pub fn full_test() -> () {
+    pub fn full_test_sql() -> () {
         let path = String::from("./test.db");
         let conn = match rusqlite::Connection::open(&path) {
             Err(e) => {
