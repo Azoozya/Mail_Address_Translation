@@ -1,5 +1,5 @@
 #[macro_use] extern crate rocket;
-use crate::webapi::{index,get_submit_user,post_submit_user,get_submit_domain,post_submit_domain};
+use crate::webapi::{index,get_submit_user,post_submit_user,get_submit_domain,post_submit_domain,get_new_alias,post_new_alias};
 
 use crate::base::DBase;
 use crate::row::MATRow;
@@ -25,7 +25,7 @@ async fn main() -> Result<(), rusqlite::Error> {
     let path = String::from("data/data.db");
 	match rocket::build()
         .mount("/", FileServer::from(relative!("static/forms")))
-        .mount("/", routes![index,get_submit_user,post_submit_user,get_submit_domain,post_submit_domain])
+        .mount("/", routes![index,get_submit_user,post_submit_user,get_submit_domain,post_submit_domain,get_new_alias,post_new_alias])
 		.launch()
 		.await {
 		Ok(_) => Ok(()),
