@@ -10,57 +10,57 @@ pub enum MATable {
 
 /*
 
-	Forge and transmit a request SELECT *what* FROM *self* *filter*.
-	Return a Vector which contain every results and the size of the vector, doesn't handle error 
+    Forge and transmit a request SELECT *what* FROM *self* *filter*.
+    Return a Vector which contain every results and the size of the vector, doesn't handle error
     select(&self, db: &DBase, what: String, filter: String) -> Result<(Vec<MATRow>, usize),rusqlite::Error>
 
-	Forge a request DELETE targeting by id/(alias,domain).
-	Return the _delete result 
+    Forge a request DELETE targeting by id/(alias,domain).
+    Return the _delete result
     delete_by_id(&self, db: &DBase, value: &MATRow) -> bool
 
-	Forge a request DELETE targeting by name/user.
-	Return the _delete result 
-	delete_by_name(&self, db: &DBase, value: &MATRow) -> bool
+    Forge a request DELETE targeting by name/user.
+    Return the _delete result
+    delete_by_name(&self, db: &DBase, value: &MATRow) -> bool
 
-	Forge and transmit a request CREATE.
-	Return false if error occured, otherwise true
-	create(&self, db: &DBase) -> bool
-    
-	Forge and transmit a request DROP.
-	Return false if error occured, otherwise true
-	drop(&self, db: &DBase) -> bool
+    Forge and transmit a request CREATE.
+    Return false if error occured, otherwise true
+    create(&self, db: &DBase) -> bool
 
-	Check if the *value* is already in base, forge a request INSERT , retrieve id's autoincremented.
-	Return false if value already in base (except for MATable::Address) , if _execute_no_param return false , if _retrieve_id returned an error , otherwise true; 
-	insert(&self, db: &DBase, value: &mut MATRow) -> bool
+    Forge and transmit a request DROP.
+    Return false if error occured, otherwise true
+    drop(&self, db: &DBase) -> bool
 
-	Return the name of the table corresponding to *row*
+    Check if the *value* is already in base, forge a request INSERT , retrieve id's autoincremented.
+    Return false if value already in base (except for MATable::Address) , if _execute_no_param return false , if _retrieve_id returned an error , otherwise true;
+    insert(&self, db: &DBase, value: &mut MATRow) -> bool
+
+    Return the name of the table corresponding to *row*
     get(row: &MATable) -> &'static str
-    
+
 ============================================================================================
 
-	Execute the request *req* and handle error. 
-	Return true if success , otherwise false
+    Execute the request *req* and handle error.
+    Return true if success , otherwise false
     _execute_no_param(&self, db: &DBase, req: &str) -> bool
 
-	Forge the request to test existence in base. 
-	Return the opposite of _exist result and handle error (return false)      
-	_unique_name(&self, db: &DBase, name: &String) -> bool
+    Forge the request to test existence in base.
+    Return the opposite of _exist result and handle error (return false)
+    _unique_name(&self, db: &DBase, name: &String) -> bool
 
-	Called by _unique_name to transmit the request. 
-	Return true if the request returned something, false if nothing , doesn't handle errors
+    Called by _unique_name to transmit the request.
+    Return true if the request returned something, false if nothing , doesn't handle errors
     _exist(&self, db: &DBase, what: String, filter: String) -> Result<bool, rusqlite::Error>
 
-	Return the name of the table corresponding to self
+    Return the name of the table corresponding to self
     _get(&self) -> &str
 
-	Forge and transmit a requeset SELECT. 
-	Return the id/user if found one, error if none
+    Forge and transmit a requeset SELECT.
+    Return the id/user if found one, error if none
     _retrieve_id(&self, db: &DBase, entity: &MATRow) -> Result<i32, rusqlite::Error>
 
 
-    Called by delete_by_*. Transmit the request DELETE FROM *self* *filter*. 
-	Return true if success , otherwise false
+    Called by delete_by_*. Transmit the request DELETE FROM *self* *filter*.
+    Return true if success , otherwise false
     _delete(&self, db: &DBase, filter: String) -> bool
 
 */
@@ -295,7 +295,7 @@ impl MATable {
         if db.up == false {
             return false;
         }
-		let filter: String = match value {
+        let filter: String = match value {
             MATRow::User {
                 id,
                 name: _,
@@ -320,8 +320,8 @@ impl MATable {
     pub fn delete_by_name(&self, db: &DBase, value: &MATRow) -> bool {
         if db.up == false {
             return false;
-        }        
-		let filter: String = match value {
+        }
+        let filter: String = match value {
             MATRow::User {
                 id: _,
                 name,
