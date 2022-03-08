@@ -186,9 +186,9 @@ impl MATable {
 			MATable::Users => "`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT NOT NULL, `pass` TEXT NOT NULL",
     		MATable::Aliases => "`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT NOT NULL",
     		MATable::Domains => "`id` INTEGER PRIMARY KEY AUTOINCREMENT, `name` TEXT NOT NULL, `nb_ref` INTEGER NOT NULL",
-			// ########################################################################################################################   			
+			// ########################################################################################################################
 			MATable::Address => "`user` INTEGER ,`alias` INTEGER , `domain` INTEGER , FOREIGN KEY(`user`) REFERENCES Users(`id`) , FOREIGN KEY(`alias`) REFERENCES Aliases(`id`) , FOREIGN KEY(`domain`) REFERENCES Domains(`id`) ,  PRIMARY KEY(`alias`,`domain`)",
-			// ########################################################################################################################   			
+			// ########################################################################################################################
 		};
         let req = format!("create table {} ( {} )", tabl, pattern);
         self._execute_no_param(db, &req)

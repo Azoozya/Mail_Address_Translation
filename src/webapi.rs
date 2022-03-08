@@ -1,18 +1,23 @@
 use rand::{thread_rng, Rng};
 use rocket::form::Form;
 use rocket::fs::NamedFile;
-use rocket::http::Status;
+use rocket::http::Status; // https://api.rocket.rs/v0.4/rocket/http/struct.Status.html#structfield.reason
 use rocket::response::status::NotFound;
 use std::thread;
 use urlencoding::decode;
 
-use crate::PATH;
+use crate::base::DBase;
+use crate::table::MATable;
+
+use crate::SQLITE_FILE;
 
 #[derive(Debug)]
 pub enum WebError {
     Empty,
     NotAnURI,
     URLEnconding,
+    DBError,
+    DBNotFound,
 }
 
 impl WebError {
@@ -21,6 +26,8 @@ impl WebError {
             WebError::Empty => Status::BadRequest,
             WebError::NotAnURI => Status::BadRequest,
             WebError::URLEnconding => Status::BadRequest,
+            WebError::DBError => Status::InternalServerError,
+            WebError::DBNotFound => Status::NoContent,
         }
     }
 }
@@ -127,7 +134,7 @@ pub async fn get_submit_user() -> Result<NamedFile, NotFound<String>> {
 #[post("/submit_user", data = "<username>")]
 pub async fn post_submit_user(mut username: Form<User>) -> Result<String, Status> {
     match username.clean() {
-        Err(e) => Err(e.to_status()),
+        Err(e) => { if cfg!(debug_assertions) { println!("{:#?}", e); } Err(e.to_status()) },
         Ok(_) => Ok(username.name()),
     }
 }
@@ -142,14 +149,75 @@ pub async fn get_list_address() -> Result<NamedFile, NotFound<String>> {
 
 #[post("/list_address", data = "<args_user>")]
 pub async fn post_list_address(mut args_user: Form<User>) -> Result<String, Status> {
-	let path = PATH.clone();
-	let usr = match args_user.clean() {
+    // Retrieve user input
+    let usr = match args_user.clean() {
         Err(e) => {
+            if cfg!(debug_assertions) { println!("{:#?}", e);}
             return Err(e.to_status());
         }
         Ok(_) => args_user.name(),
     };
-    Ok(usr)
+
+    // Request db
+    /* init conn */
+    let path = SQLITE_FILE.clone();
+    let conn = match rusqlite::Connection::open(&path) {
+        Err(e) => {
+            if cfg!(debug_assertions) { println!("{:#?}", e);}
+            return Err(WebError::DBError.to_status());
+        }
+        Ok(co) => co,
+    };
+
+    /* interact with db*/
+    let db = DBase::new(&path,&conn);
+    // get id corresponding to user
+    let tabl = MATable::Users;
+    let (answ,len) = match tabl.select(&db,String::from("id"),format!("WHERE `name` = '{}'",usr)) {
+        Err(e) => {
+            if cfg!(debug_assertions) { println!("{:#?}", e);}
+            return Err(WebError::DBError.to_status());
+        }
+        Ok((answ, len)) => (answ, len),
+    };
+
+    if len != 1 {
+        if len == 0 {
+            return Err(WebError::DBNotFound.to_status());
+        }
+        else {
+            // Multiple time same user , should not exist
+            return Err(WebError::DBError.to_status());
+        }
+    }
+
+    let usr_id = answ[0].id();
+
+    // get list of address associated to the id just retrieved
+    let tabl = MATable::Address;
+    let (answ,len) = match tabl.select(&db,String::from("`alias`"),format!("WHERE `user` = {}",usr_id)) {
+        Err(e) => {
+            if cfg!(debug_assertions) { println!("{:#?}", e);}
+            return Err(WebError::DBError.to_status());
+        }
+        Ok((answ, len)) => (answ, len),
+    };
+
+    let mut ret = String::from("");
+
+    /* ##########################        Template         ####################### */
+    for i in 0..len {
+        ret.push_str(&answ[i].name());
+        ret.push('\n');
+    }
+    /* ##########################        Template          ####################### */
+
+    /* delete conn */
+    if let Err((_, e)) = conn.close() {
+        if cfg!(debug_assertions) { println!("{:#?}", e); }
+    };
+
+    Ok(ret)
 }
 
 // #############################    DOMAIN    #############################
@@ -252,7 +320,7 @@ pub async fn get_submit_domain() -> Result<NamedFile, NotFound<String>> {
 #[post("/submit_domain", data = "<domain>")]
 pub async fn post_submit_domain(mut domain: Form<Domain>) -> Result<String, Status> {
     match domain.clean() {
-        Err(e) => Err(e.to_status()),
+        Err(e) => { if cfg!(debug_assertions) { println!("{:#?}", e);} Err(e.to_status()) },
         Ok(_) => Ok(domain.domain()),
     }
 }
@@ -285,6 +353,7 @@ pub async fn get_new_alias() -> Result<NamedFile, NotFound<String>> {
 #[post("/new_alias", data = "<args_alias>")]
 pub async fn post_new_alias(mut args_alias: Form<Alias>) -> Result<String, Status> {
     if let Err(e) = args_alias.clean() {
+        if cfg!(debug_assertions) { println!("{:#?}", e);}
         return Err(e.to_status());
     }
 

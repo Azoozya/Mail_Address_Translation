@@ -22,7 +22,7 @@ use rocket::{Build, Rocket};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref PATH: String = {
+    static ref SQLITE_FILE: String = {
         String::from("data/data.db")
     };
 }
@@ -35,7 +35,7 @@ lazy_static! {
 
 #[rocket::main]
 async fn main() -> Result<(), rusqlite::Error> {
-    let path = PATH.clone();
+    let path = SQLITE_FILE.clone();
     let conn = match rusqlite::Connection::open(&path) {
         Err(e) => {
             println!("{}", e);
