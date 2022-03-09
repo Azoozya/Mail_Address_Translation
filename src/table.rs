@@ -119,13 +119,16 @@ impl MATable {
         ) {
             Ok(b) => !b,
             Err(err) => {
-                println!("{}", err);
+                if cfg!(debug_assertions) {
+                    println!("{:#?}", err);
+                }
                 return false;
             }
         }
     }
 
     fn _retrieve_id(&self, db: &DBase, entity: &MATRow) -> Result<i32, rusqlite::Error> {
+
         let tabl = self._get();
         let req: String = match entity {
             MATRow::User {
@@ -173,6 +176,24 @@ impl MATable {
             }
             None => Err(rusqlite::Error::QueryReturnedNoRows),
         }
+    }
+
+    // find and retrieve id by name
+    pub fn find(&self, db: &DBase, entity: &MATRow) -> i32 {
+        if db.up == false {
+            return -1;
+        }
+
+        let id = match self._retrieve_id(db,entity)
+        {
+            Err(e) => {
+                if cfg!(debug_assertions) {
+                    println!("{:#?}", e);
+                } ; -1
+            },
+            Ok(id) => id,
+        };
+        id
     }
 
     // Create
@@ -343,9 +364,26 @@ impl MATable {
         self._delete(&db, filter)
     }
 
+    pub fn update_by_id(&self, db: &DBase, value: &MATRow) -> bool {
+        if db.up == false {
+            return false;
+        }
+        // UPDATE {table} SET {column} = {column} + {value} WHERE {condition}
+        true
+    }
+
+    pub fn update_by_name(&self, db: &DBase, value: &MATRow) -> bool { false }
+
+
     // Delete
     fn _delete(&self, db: &DBase, filter: String) -> bool {
         let req = format!("delete from {} {}", self._get(), filter);
+        self._execute_no_param(db, &req)
+    }
+
+    // Update
+    fn _update(&self, db: &DBase, operation: String, filter: String) -> bool {
+        let req = format!("update {} set {} where {}", self._get(), operation, filter);
         self._execute_no_param(db, &req)
     }
 

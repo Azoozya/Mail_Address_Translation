@@ -7,6 +7,7 @@ use std::thread;
 use urlencoding::decode;
 
 use crate::base::DBase;
+use crate::row::MATRow;
 use crate::table::MATable;
 
 use crate::SQLITE_FILE;
@@ -18,6 +19,7 @@ pub enum WebError {
     URLEnconding,
     DBError,
     DBNotFound,
+    DBAlreadyIn,
 }
 
 impl WebError {
@@ -28,6 +30,7 @@ impl WebError {
             WebError::URLEnconding => Status::BadRequest,
             WebError::DBError => Status::InternalServerError,
             WebError::DBNotFound => Status::NoContent,
+            WebError::DBAlreadyIn => Status::Conflict,
         }
     }
 }
@@ -121,6 +124,10 @@ impl User {
             Ok(())
         }
     }
+
+    fn clone(&self) -> User {
+        User { name: self.name() }
+    }
 }
 
 // New user : new_user GET/POST
@@ -133,10 +140,51 @@ pub async fn get_submit_user() -> Result<NamedFile, NotFound<String>> {
 
 #[post("/submit_user", data = "<username>")]
 pub async fn post_submit_user(mut username: Form<User>) -> Result<String, Status> {
-    match username.clean() {
-        Err(e) => { if cfg!(debug_assertions) { println!("{:#?}", e); } Err(e.to_status()) },
-        Ok(_) => Ok(username.name()),
+    let usr = match username.clean() {
+        Err(e) => {
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
+            return Err(e.to_status());
+        }
+        Ok(_) => username.name(),
+    };
+
+    // Request db
+    /* init conn */
+    let path = SQLITE_FILE.clone();
+    let conn = match rusqlite::Connection::open(&path) {
+        Err(e) => {
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
+            return Err(WebError::DBError.to_status());
+        }
+        Ok(co) => co,
+    };
+
+    /* interact with db*/
+    let db = DBase::new(&path, &conn);
+    let tabl = MATable::Users;
+
+    let mut usr = MATRow::User {
+        id: 0,
+        name: usr,
+        pass: String::from("000000"),
+    };
+
+    // Return !true (= false) if success , false otherwise (already in or any problem)
+    if !tabl.insert(&db, &mut usr) {
+        return Err(WebError::DBAlreadyIn.to_status());
     }
+
+    /* delete conn */
+    if let Err((_, e)) = conn.close() {
+        if cfg!(debug_assertions) {
+            println!("{:#?}", e);
+        }
+    };
+    Ok(format!("{} added in base !", usr.name()))
 }
 
 // List address (submit client , hide pass) get_address POST
@@ -152,7 +200,9 @@ pub async fn post_list_address(mut args_user: Form<User>) -> Result<String, Stat
     // Retrieve user input
     let usr = match args_user.clean() {
         Err(e) => {
-            if cfg!(debug_assertions) { println!("{:#?}", e);}
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
             return Err(e.to_status());
         }
         Ok(_) => args_user.name(),
@@ -163,29 +213,33 @@ pub async fn post_list_address(mut args_user: Form<User>) -> Result<String, Stat
     let path = SQLITE_FILE.clone();
     let conn = match rusqlite::Connection::open(&path) {
         Err(e) => {
-            if cfg!(debug_assertions) { println!("{:#?}", e);}
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
             return Err(WebError::DBError.to_status());
         }
         Ok(co) => co,
     };
 
     /* interact with db*/
-    let db = DBase::new(&path,&conn);
+    let db = DBase::new(&path, &conn);
     // get id corresponding to user
     let tabl = MATable::Users;
-    let (answ,len) = match tabl.select(&db,String::from("id"),format!("WHERE `name` = '{}'",usr)) {
-        Err(e) => {
-            if cfg!(debug_assertions) { println!("{:#?}", e);}
-            return Err(WebError::DBError.to_status());
-        }
-        Ok((answ, len)) => (answ, len),
-    };
+    let (answ, len) =
+        match tabl.select(&db, String::from("id"), format!("WHERE `name` = '{}'", usr)) {
+            Err(e) => {
+                if cfg!(debug_assertions) {
+                    println!("{:#?}", e);
+                }
+                return Err(WebError::DBError.to_status());
+            }
+            Ok((answ, len)) => (answ, len),
+        };
 
     if len != 1 {
         if len == 0 {
             return Err(WebError::DBNotFound.to_status());
-        }
-        else {
+        } else {
             // Multiple time same user , should not exist
             return Err(WebError::DBError.to_status());
         }
@@ -195,9 +249,15 @@ pub async fn post_list_address(mut args_user: Form<User>) -> Result<String, Stat
 
     // get list of address associated to the id just retrieved
     let tabl = MATable::Address;
-    let (answ,len) = match tabl.select(&db,String::from("`alias`"),format!("WHERE `user` = {}",usr_id)) {
+    let (answ, len) = match tabl.select(
+        &db,
+        String::from("`alias`"),
+        format!("WHERE `user` = {}", usr_id),
+    ) {
         Err(e) => {
-            if cfg!(debug_assertions) { println!("{:#?}", e);}
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
             return Err(WebError::DBError.to_status());
         }
         Ok((answ, len)) => (answ, len),
@@ -214,7 +274,9 @@ pub async fn post_list_address(mut args_user: Form<User>) -> Result<String, Stat
 
     /* delete conn */
     if let Err((_, e)) = conn.close() {
-        if cfg!(debug_assertions) { println!("{:#?}", e); }
+        if cfg!(debug_assertions) {
+            println!("{:#?}", e);
+        }
     };
 
     Ok(ret)
@@ -306,6 +368,12 @@ impl Domain {
         self.domain = domain;
         Ok(())
     }
+
+    fn clone(&self) -> Domain {
+        Domain {
+            domain: self.domain(),
+        }
+    }
 }
 
 //[*.]<maybe.>domain.root[/*]
@@ -319,25 +387,90 @@ pub async fn get_submit_domain() -> Result<NamedFile, NotFound<String>> {
 
 #[post("/submit_domain", data = "<domain>")]
 pub async fn post_submit_domain(mut domain: Form<Domain>) -> Result<String, Status> {
-    match domain.clean() {
-        Err(e) => { if cfg!(debug_assertions) { println!("{:#?}", e);} Err(e.to_status()) },
-        Ok(_) => Ok(domain.domain()),
+    let dmn = match domain.clean() {
+        Err(e) => {
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
+            return Err(e.to_status());
+        }
+        Ok(_) => domain.domain(),
+    };
+
+    // Request db
+    /* init conn */
+    let path = SQLITE_FILE.clone();
+    let conn = match rusqlite::Connection::open(&path) {
+        Err(e) => {
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
+            return Err(WebError::DBError.to_status());
+        }
+        Ok(co) => co,
+    };
+
+    /* interact with db*/
+    let db = DBase::new(&path, &conn);
+    let tabl = MATable::Domains;
+
+    let mut dmn = MATRow::Domain {
+        id: 0,
+        name: dmn,
+        nb_ref: 0,
+    };
+
+    // Return !true (= false) if success , false otherwise (already in or any problem)
+    if !tabl.insert(&db, &mut dmn) {
+        return Err(WebError::DBAlreadyIn.to_status());
     }
+
+    /* delete conn */
+    if let Err((_, e)) = conn.close() {
+        if cfg!(debug_assertions) {
+            println!("{:#?}", e);
+        }
+    };
+    Ok(format!("{} added in base !", dmn.name()))
 }
 
 // #############################    ALIAS    #############################
 
 #[derive(FromForm)]
-pub struct Alias {
+pub struct Address {
     user: User,
     domain: Domain,
 }
 
-impl Alias {
+impl Address {
     pub fn clean(&mut self) -> Result<(), WebError> {
         self.domain.clean()?;
         self.user.clean()?;
         Ok(())
+    }
+
+    pub fn new(usr: &String, dmn: &String) -> Address {
+        Address {
+            user: User { name: usr.clone() },
+            domain: Domain {
+                domain: dmn.clone(),
+            },
+        }
+    }
+
+    pub fn user(&self) -> User {
+        self.user.clone()
+    }
+
+    pub fn domain(&self) -> Domain {
+        self.domain.clone()
+    }
+
+    pub fn clone(&self) -> Address {
+        Address {
+            user: self.user(),
+            domain: self.domain(),
+        }
     }
 }
 
@@ -351,13 +484,72 @@ pub async fn get_new_alias() -> Result<NamedFile, NotFound<String>> {
 }
 
 #[post("/new_alias", data = "<args_alias>")]
-pub async fn post_new_alias(mut args_alias: Form<Alias>) -> Result<String, Status> {
+pub async fn post_new_alias(mut args_alias: Form<Address>) -> Result<String, Status> {
     if let Err(e) = args_alias.clean() {
-        if cfg!(debug_assertions) { println!("{:#?}", e);}
+        if cfg!(debug_assertions) {
+            println!("{:#?}", e);
+        }
         return Err(e.to_status());
     }
 
+    // Request db
+    /* init conn */
+    let path = SQLITE_FILE.clone();
+    let conn = match rusqlite::Connection::open(&path) {
+        Err(e) => {
+            if cfg!(debug_assertions) {
+                println!("{:#?}", e);
+            }
+            return Err(WebError::DBError.to_status());
+        }
+        Ok(co) => co,
+    };
+
+    /* interact with db*/
+    let db = DBase::new(&path, &conn);
+
+    let tabl = MATable::Users;
+    // Check if user exist
+    let usr = MATRow::User{
+        id: 0,
+        name: args_alias.user.name(),
+        pass: String::from("000000"),
+    };
+
+    // If not found return error/custom message
+    let usr_id = tabl.find(&db,&usr);
+    if usr_id == -1 {
+        return Err(WebError::DBNotFound.to_status())
+    }
+        // retrieve id
+
+    // Check if domain exist
+    let tabl = MATable::Domains;
+    let mut dmn = MATRow::Domain{
+        id: 0,
+        name: args_alias.domain.domain(),
+        nb_ref: 0,
+    };
+
+    let mut dmn_id = 0;
+
+    // if doesn't exist it create
+    if !tabl.insert(&db,&mut dmn){
+        // 2 possibilities , it doesn't exist OR an undefined error occurred
+        dmn_id = tabl.find(&db,&usr);
+        if dmn_id == -1 {
+                // If not found that mean it's an undefined error
+                return Err(WebError::DBNotFound.to_status())
+        }
+    }
+    else {
+        dmn_id = dmn.id();
+    }
+    // increment domain nb_ref
+
     let (left, right) = generate_random_b32_string();
+
+    // insert alias , using ids
 
     Ok(format!("{}.{}", left, right))
 }

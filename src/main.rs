@@ -18,20 +18,15 @@ mod webapi;
 use rocket::fs::{relative, FileServer};
 use rocket::{Build, Rocket};
 
-
 use lazy_static::lazy_static;
 
 lazy_static! {
-    static ref SQLITE_FILE: String = {
-        String::from("data/data.db")
-    };
+    static ref SQLITE_FILE: String = String::from("data/data.db");
 }
 // ###########################################   MAIN   ######################################
 // #[rocket::main] + async + .launch().await + Error handling
 // OR
 // #[launch] + fn rocket() -> _
-
-
 
 #[rocket::main]
 async fn main() -> Result<(), rusqlite::Error> {
@@ -45,11 +40,10 @@ async fn main() -> Result<(), rusqlite::Error> {
     };
 
     DBase::init(&path, &conn); //To be sure there is table
-    //DBase::release(&mut metadb); // to clear
+                               //DBase::release(&mut metadb); // to clear
 
     if let Err((_, e)) = conn.close() {
         println!("{}", e);
-
     };
 
     match rocket::build()
