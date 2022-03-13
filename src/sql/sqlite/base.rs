@@ -1,4 +1,4 @@
-use crate::table::MATable;
+use crate::sql::MATable;
 
 #[derive(Debug)]
 pub struct DBase<'a, 'b> {

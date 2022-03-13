@@ -1,9 +1,9 @@
 #[cfg(test)]
 pub mod tests {
 
-    use crate::base::DBase;
-    use crate::row::MATRow;
-    use crate::table::MATable;
+    use crate::sql::sqlite::base::DBase;
+    use crate::sql::sqlite::row::MATRow;
+    use crate::sql::sqlite::table::MATable;
 
     #[test]
     pub fn full_test_sql() -> () {
@@ -316,7 +316,7 @@ pub mod tests {
     }
 
     fn _test_select(db: &DBase, tabl: MATable, goal: usize, verbose: bool) -> bool {
-        let (v, nb) = match tabl.select(&db, String::from("*"), String::from("")) {
+        let (v, nb) = match tabl.select(&db, String::from("")) {
             Err(e) => {
                 println!("{}", e);
                 return false;

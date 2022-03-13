@@ -1,5 +1,5 @@
-use crate::base::DBase;
-use crate::row::MATRow;
+use crate::sql::DBase;
+use crate::sql::MATRow;
 
 pub enum MATable {
     Users,
@@ -100,8 +100,6 @@ impl MATable {
     }
 
     fn _exist(&self, db: &DBase, filter: String) -> Result<bool, rusqlite::Error> {
-        let tabl = self._get();
-
         let (_,len) = self.select(&db,filter)?;
         match len {
             0 => Ok(false),
@@ -125,8 +123,6 @@ impl MATable {
     }
 
     fn _retrieve_id(&self, db: &DBase, entity: &MATRow) -> Result<i32, rusqlite::Error> {
-
-        let tabl = self._get();
         let req: String = match entity {
             MATRow::User {
                 id: _,
@@ -337,6 +333,7 @@ impl MATable {
         self._delete(&db, filter)
     }
 
+    #[allow(dead_code)]
     pub fn delete_by_name(&self, db: &DBase, value: &MATRow) -> bool {
         if db.up == false {
             return false;
@@ -421,7 +418,7 @@ impl MATable {
         };
 
         // select by id
-        let (vec,len) = match self.select(&db,
+        let vec = match self.select(&db,
             format!("where `id` = '{}'",id)){
             Err(e) => {
                 if cfg!(debug_assertions) {
@@ -430,7 +427,7 @@ impl MATable {
                 return Err(e);
             }
             Ok((vec,len)) => {
-                if len > 0 { (vec,len) }
+                if len > 0 { vec }
                 else { return Ok(false); }
             }
         };

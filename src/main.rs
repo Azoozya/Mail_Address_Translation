@@ -1,22 +1,34 @@
 #[macro_use]
 extern crate rocket;
-use crate::webapi::{
-    get_list_address, get_new_alias, get_submit_domain, get_submit_user, index, post_list_address,
-    post_new_alias, post_submit_domain, post_submit_user,clean_get,
+
+use crate::webapi::{index,index_post,clean_get};
+use crate::webapi::user::{
+    get_list_address,
+    post_list_address,
+    get_submit_user,
+    post_submit_user,
+};
+use crate::webapi::domain::{
+    get_submit_domain,
+    post_submit_domain,
+};
+use crate::webapi::alias::{
+    get_new_alias,
+    post_new_alias,
 };
 
-use crate::base::DBase;
-use crate::row::MATRow;
-use crate::table::MATable;
+use crate::sql::sqlite::base::DBase;
+use crate::sql::sqlite::row::MATRow;
+//use crate::sqlite::table::MATable;
+
 
 use rusqlite;
-mod base;
-mod row;
-mod table;
-mod test;
+mod sql; // contains base,table,row
 mod webapi;
+mod test;
+mod error;
 use rocket::fs::{relative, FileServer};
-use rocket::{Build, Rocket};
+//use rocket::{Build, Rocket};
 
 use lazy_static::lazy_static;
 
@@ -52,15 +64,19 @@ async fn main() -> Result<(), rusqlite::Error> {
             "/",
             routes![
                 index,
-                get_submit_user,
-                post_submit_user,
-                get_submit_domain,
-                post_submit_domain,
-                get_new_alias,
-                post_new_alias,
+                index_post,
+                clean_get,
+
                 get_list_address,
                 post_list_address,
-                clean_get,
+                get_submit_user,
+                post_submit_user,
+
+                get_submit_domain,
+                post_submit_domain,
+
+                get_new_alias,
+                post_new_alias,
             ],
         )
         .launch()

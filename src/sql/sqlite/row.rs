@@ -6,11 +6,6 @@ pub enum MATRow {
     Address { user: i32, alias: i32, domain: i32 },
 }
 
-/*
-    id
-    name
-*/
-
 impl MATRow {
     pub fn id(&self) -> i32 {
         match self {
@@ -75,6 +70,7 @@ impl MATRow {
         }
     }
 
+    #[allow(dead_code)]
     pub fn pass(&self) -> String {
         match self {
             MATRow::User {
