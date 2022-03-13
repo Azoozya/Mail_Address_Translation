@@ -2,7 +2,7 @@
 extern crate rocket;
 use crate::webapi::{
     get_list_address, get_new_alias, get_submit_domain, get_submit_user, index, post_list_address,
-    post_new_alias, post_submit_domain, post_submit_user,
+    post_new_alias, post_submit_domain, post_submit_user,clean_get,
 };
 
 use crate::base::DBase;
@@ -60,6 +60,7 @@ async fn main() -> Result<(), rusqlite::Error> {
                 post_new_alias,
                 get_list_address,
                 post_list_address,
+                clean_get,
             ],
         )
         .launch()

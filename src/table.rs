@@ -10,9 +10,9 @@ pub enum MATable {
 
 /*
 
-    Forge and transmit a request SELECT *what* FROM *self* *filter*.
+    Forge and transmit a request SELECT * FROM *self* *filter*.
     Return a Vector which contain every results and the size of the vector, doesn't handle error
-    select(&self, db: &DBase, what: String, filter: String) -> Result<(Vec<MATRow>, usize),rusqlite::Error>
+    select(&self, db: &DBase, filter: String) -> Result<(Vec<MATRow>, usize),rusqlite::Error>
 
     Forge a request DELETE targeting by id/(alias,domain).
     Return the _delete result
@@ -99,22 +99,19 @@ impl MATable {
         }
     }
 
-    fn _exist(&self, db: &DBase, what: String, filter: String) -> Result<bool, rusqlite::Error> {
+    fn _exist(&self, db: &DBase, filter: String) -> Result<bool, rusqlite::Error> {
         let tabl = self._get();
-        let req = format!("select {} from {} {}", what, tabl, filter);
 
-        let mut stmt = db.conn.prepare(&req)?;
-        let mut rows = stmt.query([])?;
-        match rows.next()? {
-            Some(_) => Ok(true),
-            None => Ok(false),
+        let (_,len) = self.select(&db,filter)?;
+        match len {
+            0 => Ok(false),
+            _ => Ok(true),
         }
     }
 
     fn _unique_name(&self, db: &DBase, name: &String) -> bool {
         match self._exist(
             db,
-            String::from("`name`"),
             format!("where {} = '{}'", String::from("`name`"), name),
         ) {
             Ok(b) => !b,
@@ -166,7 +163,9 @@ impl MATable {
             ),
         };
 
-        println!("{}", req);
+        if cfg!(debug_assertions) {
+            println!("{:#?}", req);
+        }
         let mut stmt = db.conn.prepare(&req)?;
         let mut rows = stmt.query([])?;
         match rows.next()? {
@@ -364,16 +363,83 @@ impl MATable {
         self._delete(&db, filter)
     }
 
-    pub fn update_by_id(&self, db: &DBase, value: &MATRow) -> bool {
-        if db.up == false {
-            return false;
-        }
-        // UPDATE {table} SET {column} = {column} + {value} WHERE {condition}
-        true
+    fn _update_by_id(&self, db: &DBase, value: &MATRow,operation: String) -> bool {
+
+        let filter: String = match value {
+            MATRow::User {
+                id,
+                name: _,
+                pass: _,
+            } => format!("where `id` = {}", id),
+            MATRow::Alias { id, name: _ } => format!("where `id` = {}", id),
+            MATRow::Domain {
+                id,
+                name: _,
+                nb_ref: _,
+            } => format!("where `id` = {}", id),
+            MATRow::Address {
+                user: _,
+                alias,
+                domain,
+            } => format!("where `alias` = {} and `domain` = {}", alias, domain),
+        };
+
+        self._update(&db, operation, filter)
     }
 
-    pub fn update_by_name(&self, db: &DBase, value: &MATRow) -> bool { false }
+    fn _update_by_name(&self, db: &DBase, value: &MATRow,operation: String) -> bool {
 
+        let filter: String = match value {
+            MATRow::User {
+                id: _,
+                name,
+                pass: _,
+            } => format!("where `name` = '{}'", name.clone()),
+            MATRow::Alias { id: _, name } => format!("where `name` = '{}'", name.clone()),
+            MATRow::Domain {
+                id: _,
+                name,
+                nb_ref: _,
+            } => format!("where `name` = '{}'", name.clone()),
+            MATRow::Address {
+                user: _,
+                alias,
+                domain,
+            } => format!("where `alias` = '{}' and `domain` = {}", alias, domain),
+        };
+
+        self._update(&db, operation, filter)
+     }
+
+    // Try to update nb_ref by delta (positive as negative)
+    // if nb_ref can't be
+    pub fn updt_ref(&self, db: &DBase, id: i32, mut delta: i32) -> Result<bool, rusqlite::Error>{
+
+        match self {
+            MATable::Domains => (),
+            _ => { return Ok(false); },
+        };
+
+        // select by id
+        let (vec,len) = match self.select(&db,
+            format!("where `id` = '{}'",id)){
+            Err(e) => {
+                if cfg!(debug_assertions) {
+                        println!("{:#?}", e);
+                };
+                return Err(e);
+            }
+            Ok((vec,len)) => {
+                if len > 0 { (vec,len) }
+                else { return Ok(false); }
+            }
+        };
+
+        let nb_ref = vec[0].nb_ref();
+        if delta < 0 && nb_ref < -delta { delta = -nb_ref }
+
+        Ok(self._update_by_name(&db,&vec[0],format!("`nb_ref` = `nb_ref` + {}",delta)))
+    }
 
     // Delete
     fn _delete(&self, db: &DBase, filter: String) -> bool {
@@ -382,8 +448,12 @@ impl MATable {
     }
 
     // Update
+    // UPDATE {table} SET {column} = {column} + {value} WHERE {condition}
     fn _update(&self, db: &DBase, operation: String, filter: String) -> bool {
-        let req = format!("update {} set {} where {}", self._get(), operation, filter);
+        let req = format!("update {} set {} {}", self._get(), operation, filter);
+        if cfg!(debug_assertions) {
+                println!("{:#?}", req);
+        };
         self._execute_no_param(db, &req)
     }
 
@@ -391,7 +461,6 @@ impl MATable {
     pub fn select(
         &self,
         db: &DBase,
-        what: String,
         filter: String,
     ) -> Result<(Vec<MATRow>, usize), rusqlite::Error> {
         if db.up == false {
@@ -399,7 +468,7 @@ impl MATable {
         }
 
         let tabl = self._get();
-        let req = format!("select {} from {} {}", what, tabl, filter);
+        let req = format!("select * from {} {}", tabl, filter);
 
         let mut stmt = db.conn.prepare(&req)?;
         let mut rows = stmt.query([])?;

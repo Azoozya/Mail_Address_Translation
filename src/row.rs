@@ -39,13 +39,13 @@ impl MATRow {
                 id: _,
                 name,
                 pass: _,
-            } => format!("'{}'", name.clone()),
-            MATRow::Alias { id: _, name } => format!("'{}'", name.clone()),
+            } => format!("{}", name.clone()),
+            MATRow::Alias { id: _, name } => format!("{}", name.clone()),
             MATRow::Domain {
                 id: _,
                 name,
                 nb_ref: _,
-            } => format!("'{}'", name.clone()),
+            } => format!("{}", name.clone()),
             MATRow::Address {
                 user: _,
                 alias: _,
@@ -53,4 +53,47 @@ impl MATRow {
             } => String::from(""),
         }
     }
+
+    pub fn nb_ref(&self) -> i32 {
+        match self {
+            MATRow::User {
+                id:_,
+                name: _,
+                pass: _,
+            } => -1,
+            MATRow::Alias { id: _, name: _ } => -1,
+            MATRow::Domain {
+                id: _,
+                name: _,
+                nb_ref,
+            } => *nb_ref,
+            MATRow::Address {
+                user: _,
+                alias: _,
+                domain: _,
+            } => -1,
+        }
+    }
+
+    pub fn pass(&self) -> String {
+        match self {
+            MATRow::User {
+                id: _,
+                name: _,
+                pass,
+            } => format!("{}", pass.clone()),
+            MATRow::Alias { id: _, name: _ } => String::from(""),
+            MATRow::Domain {
+                id: _,
+                name: _,
+                nb_ref: _,
+            } => String::from(""),
+            MATRow::Address {
+                user: _,
+                alias: _,
+                domain: _,
+            } => String::from(""),
+        }
+    }
+
 }
