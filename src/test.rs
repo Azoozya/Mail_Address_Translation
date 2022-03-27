@@ -5,6 +5,14 @@ pub mod tests {
     use crate::sql::sqlite::row::MATRow;
     use crate::sql::sqlite::table::MATable;
 
+    // use crate::webapi::domain::Domain;
+    // use crate::webapi::user::User;
+    // use crate::webapi::address::Address;
+
+    // https://api.rocket.rs/v0.5-rc/rocket/local/blocking/struct.Client.html
+    use rocket::local::blocking::Client;
+    use rocket::http::Status;
+
     #[test]
     pub fn full_test_sql() -> () {
         let path = String::from("./test.db");
@@ -414,4 +422,63 @@ pub mod tests {
         );
         result
     }
+
+    //https://rocket.rs/v0.5-rc/guide/testing/
+    #[test]
+    pub fn full_test_webapi() -> (){
+        assert_eq!(_clean(), true);
+        assert_eq!(test_user(), true);
+        assert_eq!(test_domain(), true);
+        assert_eq!(test_address(), true);
+    }
+
+
+    fn _clean() -> bool {
+        let client = Client::tracked(crate::rocket()).expect("valid rocket instance");
+        let response = client.get("/clean").dispatch();
+        response.status() == Status::Ok
+    }
+
+    fn test_user() -> bool {
+        let client = Client::tracked(crate::rocket()).expect("valid rocket instance");
+
+        let get = client.get("/submit_user").dispatch();
+        if get.status() != Status::Ok
+        {
+            println!("[GET] submit_user : {}",get.status());
+            return false;
+        }
+
+/*
+        let post = client.post("/submit_user").body("{name=loma}").dispatch();
+        if post.status() != Status::Ok
+        {
+            println!("[POST] submit_user : {}",post.status());
+            return false;
+        }
+
+        // Should cause an error, due to conflict it creates in db
+        // # Good choice ? -> Sherlock
+        let repost = client.post("/submit_user").body(r#"{ "name": "lama" }"#).dispatch();
+        if repost.status() == Status::Conflict
+        {
+            println!("[RE-POST] submit_user : {}",repost.status());
+            return false;
+        }
+*/
+        true
+    }
+
+    fn test_domain() -> bool {
+        let client = Client::tracked(crate::rocket()).expect("valid rocket instance");
+        let response = client.get("/submit_domain").dispatch();
+        response.status() == Status::Ok
+    }
+
+    fn test_address() -> bool {
+        let client = Client::tracked(crate::rocket()).expect("valid rocket instance");
+        let response = client.get("/new_address").dispatch();
+        response.status() == Status::Ok
+    }
+
 }

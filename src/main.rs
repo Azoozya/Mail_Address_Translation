@@ -12,9 +12,9 @@ use crate::webapi::domain::{
     get_submit_domain,
     post_submit_domain,
 };
-use crate::webapi::alias::{
-    get_new_alias,
-    post_new_alias,
+use crate::webapi::address::{
+    get_new_address,
+    post_new_address,
 };
 
 use crate::sql::sqlite::base::DBase;
@@ -27,6 +27,8 @@ mod sql; // contains base,table,row
 mod webapi;
 mod test;
 mod error;
+
+use rocket::{Rocket,Build};
 use rocket::fs::{relative, FileServer};
 //use rocket::{Build, Rocket};
 
@@ -40,16 +42,11 @@ lazy_static! {
 // OR
 // #[launch] + fn rocket() -> _
 
+/*
 #[rocket::main]
-async fn main() -> Result<(), rusqlite::Error> {
+async fn main() -> () {
     let path = SQLITE_FILE.clone();
-    let conn = match rusqlite::Connection::open(&path) {
-        Err(e) => {
-            println!("{}", e);
-            return Err(e);
-        }
-        Ok(co) => co,
-    };
+    let conn = rusqlite::Connection::open(&path).expect("SQLITE file not found");
 
     DBase::init(&path, &conn); //To be sure there is table
                                //DBase::release(&mut metadb); // to clear
@@ -58,7 +55,7 @@ async fn main() -> Result<(), rusqlite::Error> {
         println!("{}", e);
     };
 
-    match rocket::build()
+    if let Err(e) = rocket::build()
         .mount("/", FileServer::from(relative!("static/forms")))
         .mount(
             "/",
@@ -75,27 +72,49 @@ async fn main() -> Result<(), rusqlite::Error> {
                 get_submit_domain,
                 post_submit_domain,
 
-                get_new_alias,
-                post_new_alias,
+                get_new_address,
+                post_new_address,
             ],
         )
         .launch()
         .await
-    {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            println!("{}", e);
-            Ok(())
-        }
-    }
-}
+        { println!("{:#?}", e); };
+}*/
 
 // ###########################################   MAIN   ######################################
 
-/*
+
 #[launch]
-fn rocket() -> _ {
+fn rocket() -> Rocket<Build> {
+    let path = SQLITE_FILE.clone();
+    let conn = rusqlite::Connection::open(&path).expect("SQLITE file not found");
+
+    DBase::init(&path, &conn); //To be sure there is table
+                               //DBase::release(&mut metadb); // to clear
+
+    if let Err((_, e)) = conn.close() {
+        println!("{}", e);
+    };
+
     rocket::build()
         .mount("/", FileServer::from(relative!("static/forms")))
-        .mount("/", routes![index])
-}*/
+        .mount(
+            "/",
+            routes![
+                index,
+                index_post,
+                clean_get,
+
+                get_list_address,
+                post_list_address,
+                get_submit_user,
+                post_submit_user,
+
+                get_submit_domain,
+                post_submit_domain,
+
+                get_new_address,
+                post_new_address,
+            ],
+        )
+}

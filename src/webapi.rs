@@ -13,13 +13,13 @@ use crate::sql::sqlite::table::MATable;
 
 use crate::webapi::user::User;
 use crate::webapi::domain::Domain;
-//use crate::webapi::alias::Address;
+//use crate::webapi::address::Address;
 
 use crate::error::MATError;
 use crate::SQLITE_FILE;
 
 pub mod user;
-pub mod alias;
+pub mod address;
 pub mod domain;
 
 fn base32(number: usize) -> String {
