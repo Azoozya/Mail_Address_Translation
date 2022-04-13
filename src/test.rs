@@ -11,7 +11,7 @@ pub mod tests {
 
     // https://api.rocket.rs/v0.5-rc/rocket/local/blocking/struct.Client.html
     use rocket::local::blocking::Client;
-    use rocket::http::Status;
+    use rocket::http::{ContentType,Status};
 
     #[test]
     pub fn full_test_sql() -> () {
@@ -449,8 +449,7 @@ pub mod tests {
             return false;
         }
 
-/*
-        let post = client.post("/submit_user").body("{name=loma}").dispatch();
+        let post = client.post("/submit_user").header(ContentType::Form).body("name=lama").dispatch();
         if post.status() != Status::Ok
         {
             println!("[POST] submit_user : {}",post.status());
@@ -459,13 +458,13 @@ pub mod tests {
 
         // Should cause an error, due to conflict it creates in db
         // # Good choice ? -> Sherlock
-        let repost = client.post("/submit_user").body(r#"{ "name": "lama" }"#).dispatch();
-        if repost.status() == Status::Conflict
+        let repost = client.post("/submit_user").header(ContentType::Form).body("name=lama").dispatch();
+        if repost.status() != Status::Conflict
         {
             println!("[RE-POST] submit_user : {}",repost.status());
             return false;
         }
-*/
+
         true
     }
 
