@@ -122,7 +122,7 @@ pub async fn post_new_address(mut args_address: Form<Address>) -> Result<String,
         dmn_id = tabld.find(&db,&dmn);
         if dmn_id == -1 {
                 // If not found that mean it's an undefined error
-                return Err(MATError::DBNotFound.to_status())
+                return Err(MATError::DBError.to_status())
         }
     }
     else {

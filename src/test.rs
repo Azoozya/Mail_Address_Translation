@@ -11,6 +11,7 @@ pub mod tests {
 
     // https://api.rocket.rs/v0.5-rc/rocket/local/blocking/struct.Client.html
     use rocket::local::blocking::Client;
+    //https://api.rocket.rs/v0.5-rc/rocket/http/struct.ContentType.html#associatedconstant.Form
     use rocket::http::{ContentType,Status};
 
     #[test]
@@ -430,6 +431,7 @@ pub mod tests {
         assert_eq!(test_user(), true);
         assert_eq!(test_domain(), true);
         assert_eq!(test_address(), true);
+        _clean();
     }
 
 
@@ -445,14 +447,14 @@ pub mod tests {
         let get = client.get("/submit_user").dispatch();
         if get.status() != Status::Ok
         {
-            println!("[GET] submit_user : {}",get.status());
+            println!("[GET] test user : {}",get.status());
             return false;
         }
 
         let post = client.post("/submit_user").header(ContentType::Form).body("name=lama").dispatch();
         if post.status() != Status::Ok
         {
-            println!("[POST] submit_user : {}",post.status());
+            println!("[POST] test user : {}",post.status());
             return false;
         }
 
@@ -461,7 +463,7 @@ pub mod tests {
         let repost = client.post("/submit_user").header(ContentType::Form).body("name=lama").dispatch();
         if repost.status() != Status::Conflict
         {
-            println!("[RE-POST] submit_user : {}",repost.status());
+            println!("[RE-POST] test user : {}",repost.status());
             return false;
         }
 
@@ -470,14 +472,97 @@ pub mod tests {
 
     fn test_domain() -> bool {
         let client = Client::tracked(crate::rocket()).expect("valid rocket instance");
-        let response = client.get("/submit_domain").dispatch();
-        response.status() == Status::Ok
+        
+        let get = client.get("/submit_domain").dispatch();
+        if get.status() != Status::Ok
+        {
+            println!("[GET] test domain : {}",get.status());
+            return false;
+        }
+
+        let post = client.post("/submit_domain").header(ContentType::Form).body("domain=lama.fr").dispatch();
+        if post.status() != Status::Ok
+        {
+            println!("[POST] test domain : {}",post.status());
+            return false;
+        }
+
+        let repost = client.post("/submit_domain").header(ContentType::Form).body("domain=lama.fr").dispatch();
+        if repost.status() != Status::Conflict
+        {
+            println!("[RE-POST] test domain : {}",repost.status());
+            return false;
+        }
+
+        true
     }
 
     fn test_address() -> bool {
         let client = Client::tracked(crate::rocket()).expect("valid rocket instance");
-        let response = client.get("/new_address").dispatch();
-        response.status() == Status::Ok
+
+        let get = client.get("/new_address").dispatch();
+        if get.status() != Status::Ok
+        {
+            println!("[GET] test address : {}",get.status());
+            return false;
+        }
+
+        // Correct way
+        let post = client.post("/new_address").header(ContentType::Form).body("user.name=lama&domain.domain=lama.fr").dispatch();
+        if post.status() != Status::Ok
+        {
+            println!("[POST] test address : {}",post.status());
+            return false;
+        }
+
+        let repost = client.post("/new_address").header(ContentType::Form).body("user.name=lama&domain.domain=lama.fr").dispatch();
+        if repost.status() != Status::Ok
+        {
+            println!("[RE-POST] test address : {}",repost.status());
+            return false;
+        }
+
+        // If user is missing in db
+        let inv_user = client.post("/new_address").header(ContentType::Form).body("user.name=UNKNOWN&domain.domain=lama.fr").dispatch();
+        if inv_user.status() == Status::Ok
+        {
+            println!("[User invalid POST] test address : {}",inv_user.status());
+            return false;
+        }
+
+        // If domain is missing in db, should return true cuz it create the domain
+        let inv_domain = client.post("/new_address").header(ContentType::Form).body("user.name=lama&domain.domain=UN.KNOWN").dispatch();
+        if inv_domain.status() != Status::Ok
+        {
+            println!("[Domain invalid POST] test address : {}",inv_domain.status());
+            return false;
+        }
+
+        let inv_domain_repost = client.post("/submit_domain").header(ContentType::Form).body("domain=UN.KNOWN").dispatch();
+        if inv_domain_repost.status() != Status::Conflict
+        {
+            println!("[Domain invalid RE-POST] test address : {}",inv_domain_repost.status());
+            return false;
+        }
+
+        // Listing
+
+        let listing = client.post("/list_address").header(ContentType::Form).body("name=lama").dispatch();
+        if listing.status() != Status::Ok
+        {
+            println!("[Listing POST] test address : {}",listing.status());
+            return false;
+        }
+
+        //if user doesn't exist
+        let inv_listing = client.post("/list_address").header(ContentType::Form).body("name=UNKNOWN").dispatch();
+        if inv_listing.status() != Status::NoContent
+        {
+            println!("[Invalid listing POST] test address : {}",inv_listing.status());
+            return false;
+        }
+
+        true
     }
 
 }
